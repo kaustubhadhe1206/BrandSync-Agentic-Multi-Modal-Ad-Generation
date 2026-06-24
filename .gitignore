@@ -1,0 +1,36 @@
+# Secrets / local config
+.env
+.env.local
+.env.*.local
+*.pem
+
+# AI assistant context — not meant for the public repo
+CLAUDE.md
+
+# Python (backend)
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Generated media — local scratch space only, never the source of truth
+# (uploaded to Supabase immediately; see CLAUDE.md "Artifact storage")
+backend/artifacts/
+
+# Node (frontend)
+node_modules/
+frontend/dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

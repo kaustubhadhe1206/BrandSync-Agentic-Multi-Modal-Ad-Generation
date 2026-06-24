@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-ink-900 text-bone font-sans antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+    /* Ambient violet glow, off-screen — the "control room at night" backdrop */
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(124, 92, 252, 0.16), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 100% 20%, rgba(124, 92, 252, 0.10), transparent 60%);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+  }
+
+  /* Accent emphasis — clean sans, no italic/serif (matches the reference's
+     all-sans look; this used to be an italic serif treatment). */
+  .display-italic {
+    font-weight: 600;
+  }
+
+  /* Hairline rules */
+  .rule {
+    @apply border-t border-ink-700;
+  }
+
+  /* Eyebrow — small caps lookalike used above section headers */
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.18em] text-ink-400;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ink-700 rounded;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-600;
+  }
+}
+
+@layer components {
+  /* Live dot — chartreuse pulse for currently-acting agent */
+  .live-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full bg-live animate-live-pulse;
+  }
+
+  .idle-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full bg-ink-500;
+  }
+
+  .done-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full bg-coral;
+  }
+
+  /* Slate — the signature framed element */
+  .slate-frame {
+    @apply border border-ink-700 bg-ink-800 rounded-2xl;
+    box-shadow: inset 0 0 0 1px rgba(124, 92, 252, 0);
+    transition: box-shadow 240ms ease, border-color 240ms ease;
+  }
+
+  .slate-frame--active {
+    border-color: rgba(255, 165, 87, 0.35);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 165, 87, 0.35),
+      0 0 28px rgba(255, 165, 87, 0.12);
+  }
+
+  .slate-frame--done {
+    border-color: rgba(124, 92, 252, 0.35);
+    box-shadow:
+      inset 0 0 0 1px rgba(124, 92, 252, 0.35),
+      0 0 28px rgba(124, 92, 252, 0.10);
+  }
+
+  /* Status pill — small rounded badge with a leading dot, matching the
+     reference's "building" / "Python 3.11" chips */
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-600
+      bg-ink-700/60 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.1em]
+      text-bone/80;
+  }
+
+  .pill-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full;
+  }
+
+  /* Loading bar — indeterminate shimmer used while an agent/tool is running */
+  .progress-track {
+    @apply relative w-full h-1.5 rounded-full bg-ink-700 overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply absolute inset-y-0 left-0 w-1/3 rounded-full;
+    background: linear-gradient(90deg, transparent, #ffa557, #7c5cfc, transparent);
+  }
+}

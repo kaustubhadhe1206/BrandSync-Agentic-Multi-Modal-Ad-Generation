@@ -1,0 +1,22 @@
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.9.0
+pydantic-settings>=2.6.0
+
+# Google ADK + GenAI SDK
+google-adk>=1.0.0
+google-genai>=1.52.0
+
+# Scraper
+httpx>=0.27.0
+beautifulsoup4>=4.12.0
+
+# Image handling
+pillow>=10.4.0
+
+# .env
+python-dotenv>=1.0.0
+
+# Cloud cache (cuts regeneration cost on repeat URLs; storage stays
+# off local disk so it survives across deploys)
+supabase>=2.10.0
