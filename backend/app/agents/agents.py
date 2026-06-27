@@ -2,7 +2,11 @@
 
 The Strategist <-> Critic loop is what makes this genuinely agentic rather than
 a pipeline: the Critic agent can REJECT a brief and force the Strategist to
-revise, up to MAX_CRITIQUE_ITERATIONS.
+revise, up to MAX_CRITIQUE_ITERATIONS. Both run on Claude (settings.MODEL_CRITIQUE)
+since this is a negotiation, not generation — the Strategist can push back on a
+critique with a `rebuttal` instead of just complying (see agents/tools.py
+submit_brief). Every other agent stays on Gemini; only Director/Post-Production's
+tools call the actual Gemini/Veo/Lyria/TTS generation models.
 
 Architecture:
 
@@ -30,10 +34,19 @@ from google.adk.agents import BaseAgent, LlmAgent, SequentialAgent, LoopAgent
 from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events.event import Event
 from google.adk.events.event_actions import EventActions
+from google.adk.models.anthropic_llm import AnthropicLlm
 
 from ..config import settings
 from . import prompts
 from . import tools as agent_tools
+
+# ADK's model registry auto-resolves any plain "claude-*" string to the
+# `Claude` class specifically, which is the VERTEX AI variant (needs
+# GOOGLE_CLOUD_PROJECT/GOOGLE_CLOUD_LOCATION) — not the direct-API
+# `AnthropicLlm` base class that just needs ANTHROPIC_API_KEY. Constructing
+# AnthropicLlm explicitly bypasses that registry resolution so this hits
+# Anthropic's API directly with no Google Cloud project involved.
+_critique_model = AnthropicLlm(model=settings.MODEL_CRITIQUE)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -41,7 +54,7 @@ from . import tools as agent_tools
 # ────────────────────────────────────────────────────────────────────────────
 strategist_agent = LlmAgent(
     name="strategist",
-    model=settings.MODEL_BRAIN,
+    model=_critique_model,
     description="Reads a website and produces a detailed creative brief for the video ad.",
     instruction=prompts.STRATEGIST_INSTRUCTION,
     tools=[
@@ -57,7 +70,7 @@ strategist_agent = LlmAgent(
 # ────────────────────────────────────────────────────────────────────────────
 critic_agent = LlmAgent(
     name="critic",
-    model=settings.MODEL_FAST,
+    model=_critique_model,
     description="Evaluates whether a brief from the Strategist is workable.",
     instruction=prompts.CRITIC_INSTRUCTION,
     output_key="director_critique",

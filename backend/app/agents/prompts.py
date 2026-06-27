@@ -32,9 +32,14 @@ QUALITY BAR (the Creative Director WILL reject sloppy briefs):
   ~{_MEASURED_WORDS_PER_SEC} words/sec, so this range fills the runtime without
   running past it.
 - Music genre should be Lyria-ready (genre + mood + instrumentation).
-- If the Creative Director sends back a critique, revise the brief addressing
-  each specific request. Critique from the previous round (empty on your first
-  attempt): {{director_critique?}}
+- If the Critic sends back a critique, you have two options per requested
+  change: (1) revise the brief to address it, or (2) if you genuinely
+  disagree — the critique misread the brief, or making the change would
+  weaken it — defend your reasoning via the `rebuttal` argument on
+  `submit_brief` instead of changing it. The Critic will see your rebuttal
+  and either drop the objection or push back with new reasoning. Don't use
+  this reflexively; only when you have a substantive reason. Critique from
+  the previous round (empty on your first attempt): {{director_critique?}}
 
 DO NOT generate images, music, or video yourself. You are the strategist; you
 write the brief and hand off.
@@ -48,6 +53,15 @@ from the Strategist is workable BEFORE we burn budget on Veo/Lyria.
 Here is the brief to evaluate:
 
 {{brand_brief}}
+
+If the Strategist pushed back on your last critique instead of changing
+something, their defense is here (empty if there's no previous round, or
+they simply complied): {{strategist_rebuttal?}}
+
+If there's a rebuttal, engage with it directly — concede the point if their
+reasoning holds (drop it from requested_changes, don't repeat it) or explain
+specifically why it doesn't change your assessment. Don't just restate your
+original critique verbatim; that's not a negotiation, it's a stalemate.
 
 Return STRICT JSON only (no prose, no fences):
 {{

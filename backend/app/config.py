@@ -10,7 +10,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- API keys ---
-    GOOGLE_API_KEY: str = ""  # AI Studio key; google-genai also reads GEMINI_API_KEY
+    GOOGLE_API_KEY: str = ""     # AI Studio key; google-genai also reads GEMINI_API_KEY
+    ANTHROPIC_API_KEY: str = ""  # Claude — Strategist/Critic negotiation only
 
     # --- Cloud cache (optional) ---
     SUPABASE_URL: str = ""
@@ -24,13 +25,15 @@ class Settings(BaseSettings):
     MODEL_VIDEO: str = "veo-3.1-lite-generate-preview"  # Veo 3.1 Lite: $0.05/s @720p vs $0.40/s standard
     MODEL_MUSIC: str = "lyria-3-clip-preview"           # Lyria 3, 30s clip
     MODEL_TTS: str = "gemini-3.1-flash-tts-preview"
+    MODEL_CRITIQUE: str = "claude-sonnet-4-6"           # Strategist + Critic negotiation
 
     # --- Generation knobs ---
     IMAGE_CANDIDATES: int = 2          # how many images Nano Banana produces before ranking
     VIDEO_DURATION_SEC: int = 8        # Veo clip length
     SCRAPER_MAX_PAGES: int = 6
     SCRAPER_TIMEOUT_SEC: int = 15
-    MAX_CRITIQUE_ITERATIONS: int = 2   # Strategist <-> Director loop guard
+    SCRAPER_MAX_IMAGES_TO_ANALYZE: int = 5  # real images downloaded + described per scrape
+    MAX_CRITIQUE_ITERATIONS: int = 4   # negotiation round cap (escalate gate usually exits earlier)
 
     # --- Filesystem ---
     OUTPUT_DIR: Path = Path("./artifacts")
@@ -43,9 +46,12 @@ class Settings(BaseSettings):
 
     def ensure_dirs(self) -> None:
         self.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        # Propagate API key for google-genai SDK which reads env vars at client init
+        # Propagate API keys for SDKs that read env vars directly at client
+        # init (pydantic-settings loads .env into this object, not os.environ)
         if self.GOOGLE_API_KEY and not os.environ.get("GEMINI_API_KEY"):
             os.environ["GEMINI_API_KEY"] = self.GOOGLE_API_KEY
+        if self.ANTHROPIC_API_KEY and not os.environ.get("ANTHROPIC_API_KEY"):
+            os.environ["ANTHROPIC_API_KEY"] = self.ANTHROPIC_API_KEY
 
 
 settings = Settings()

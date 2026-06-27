@@ -35,6 +35,52 @@ function findPendingCall(events) {
   return null;
 }
 
+// The Critic's message is raw JSON ({accept, reason, requested_changes}) —
+// parse it so we can render a real callout instead of a JSON blob. Strips
+// code fences defensively, same as the backend's own _parse_critique.
+function tryParseCritique(text) {
+  if (!text) return null;
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  try {
+    const parsed = JSON.parse(cleaned);
+    return parsed && typeof parsed === 'object' && 'accept' in parsed ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function CritiqueCard({ critique }) {
+  const accepted = Boolean(critique.accept);
+  return (
+    <div className={`rounded-lg border px-3 py-2.5 ${accepted ? 'border-coral/40 bg-coral/5' : 'border-ink-600 bg-ink-800/60'}`}>
+      <span className={`font-mono text-[10px] uppercase tracking-[0.15em] ${accepted ? 'text-coral' : 'text-ink-400'}`}>
+        {accepted ? '✓ Brief accepted' : '✕ Revision requested'}
+      </span>
+      {critique.reason && (
+        <p className="mt-1 text-[12px] text-bone/85 leading-snug">{critique.reason}</p>
+      )}
+      {!accepted && Array.isArray(critique.requested_changes) && critique.requested_changes.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {critique.requested_changes.map((c, i) => (
+            <li key={i} className="text-[11px] text-ink-400 leading-snug">· {c}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function RebuttalCard({ rebuttal }) {
+  return (
+    <div className="rounded-lg border border-coral/40 bg-coral/5 px-3 py-2.5">
+      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-coral">
+        ↩ Strategist pushes back
+      </span>
+      <p className="mt-1 text-[12px] text-bone/85 leading-snug">{rebuttal}</p>
+    </div>
+  );
+}
+
 function EventRow({ ev }) {
   const time = new Date(ev.timestamp * 1000).toLocaleTimeString(undefined, {
     hour12: false,
@@ -45,12 +91,20 @@ function EventRow({ ev }) {
 
   const isToolCall = ev.kind === 'tool_call';
   const isError = ev.kind === 'error';
+  const isCritic = ev.agent === 'critic';
+  const rebuttal = isToolCall && ev.data?.tool_name === 'submit_brief' ? ev.data?.args?.rebuttal : null;
+  const critique = isCritic && ev.kind === 'message' ? tryParseCritique(ev.text) : null;
 
   return (
     <div className="animate-slide-up py-2.5 first:pt-0">
       <div className="flex gap-3 items-baseline">
         <span className="font-mono text-[10px] text-ink-500 shrink-0 tabular-nums">{time}</span>
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 space-y-1.5">
+          {isCritic && (
+            <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-400">
+              ⟲ Critic
+            </div>
+          )}
           {isToolCall && (
             <div className="font-mono text-[12px] text-coral mb-0.5">
               → {ev.data?.tool_name}()
@@ -59,9 +113,16 @@ function EventRow({ ev }) {
           {isError && (
             <div className="font-mono text-[12px] text-coral mb-0.5">ERROR</div>
           )}
-          <div className={`text-[13px] leading-snug whitespace-pre-wrap break-words ${isError ? 'text-coral' : 'text-bone/85'}`}>
-            {ev.text}
-          </div>
+
+          {critique ? (
+            <CritiqueCard critique={critique} />
+          ) : (
+            <div className={`text-[13px] leading-snug whitespace-pre-wrap break-words ${isError ? 'text-coral' : 'text-bone/85'}`}>
+              {ev.text}
+            </div>
+          )}
+
+          {rebuttal && <RebuttalCard rebuttal={rebuttal} />}
         </div>
       </div>
     </div>

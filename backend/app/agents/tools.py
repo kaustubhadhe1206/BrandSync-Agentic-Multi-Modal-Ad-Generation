@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from pathlib import Path
 from typing import Any
 
 from google.adk.tools import ToolContext
@@ -78,10 +77,21 @@ async def submit_brief(
     voice_name: GeminiVoiceName,
     voiceover_script: str,
     tool_context: ToolContext,
+    rebuttal: str = "",
 ) -> dict[str, Any]:
     """Submit the completed BrandBrief. Stores it in session state.
 
-    Call this exactly once when you've finished writing the brief.
+    Call this every round, even when you haven't changed anything in
+    response to a critique.
+
+    Args:
+        rebuttal: Leave empty if you agree with the Critic's last critique
+            (or there isn't one yet). If you disagree with some or all of
+            the requested changes, explain specifically why here instead of
+            making the change — the Critic will see this and either concede
+            or respond with new reasoning. Don't push back reflexively; only
+            use this when you have a substantive reason the brief is right
+            as-is.
     """
     source_url = tool_context.state.get("source_url", "https://example.com")
     brief = BrandBrief(
@@ -111,6 +121,9 @@ async def submit_brief(
         voiceover_script=voiceover_script,
     )
     tool_context.state["brand_brief"] = brief.model_dump(mode="json")
+    # Always overwrite, even with "" — a stale rebuttal from an earlier
+    # round must not leak into the Critic's view of the current one.
+    tool_context.state["strategist_rebuttal"] = rebuttal
     return {"status": "submitted", "business_name": business_name}
 
 
@@ -315,14 +328,15 @@ async def sync_final_video(tool_context: ToolContext) -> dict[str, Any]:
         session_id=session_id,
     )
 
-    # The raw Veo clips were only ever needed to produce final.mp4 — nothing
-    # reads them again, so delete them now rather than uploading them
-    # anywhere or letting them sit on local disk.
-    for clip_path in clip_paths:
-        try:
-            Path(clip_path).unlink(missing_ok=True)
-        except OSError:
-            pass
+    # Upload (don't delete) the raw clips — a later audio-only feedback round
+    # (orchestrator._remux_only) reuses this exact footage instead of paying
+    # for Veo again just to swap the music/voiceover track. This used to
+    # delete them on the assumption "nothing reads them again", which broke
+    # the moment scoped audio feedback needed to remux against them.
+    clip_paths = await asyncio.gather(*[
+        cloud_cache.store_asset(p, session_id, "video") for p in clip_paths
+    ])
+    tool_context.state["veo_clip_paths"] = list(clip_paths)
 
     # Upload the actual deliverable immediately — never required to survive
     # on this backend's local disk past this request.
