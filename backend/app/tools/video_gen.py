@@ -16,6 +16,15 @@ from google.genai import types as genai_types
 
 from ..config import settings
 
+_MAX_ATTEMPTS = 3
+_RETRY_BACKOFF_SEC = (20, 40)  # wait before attempt 2, then before attempt 3
+
+
+class VeoSafetyBlocked(RuntimeError):
+    """Raised when Veo completes but withholds the video for responsible-AI
+    reasons. Not transient — retrying the same image+prompt will fail the
+    same way, so this is deliberately NOT caught by the retry loop below."""
+
 
 def _load_image(image_path: str) -> genai_types.Image:
     """Load a hero image for Veo, whether it's a local artifact path or a
@@ -76,7 +85,7 @@ async def generate_video_from_image(
         response = operation.response
         if not response or not response.generated_videos:
             reasons = response.rai_media_filtered_reasons if response else None
-            raise RuntimeError(
+            raise VeoSafetyBlocked(
                 "Veo completed but returned no video — likely blocked by responsible-AI "
                 f"safety filtering. reasons={reasons or 'unknown'}"
             )
@@ -90,4 +99,17 @@ async def generate_video_from_image(
         out_path.write_bytes(video.video_bytes)
         return out_path.as_posix()
 
-    return await asyncio.to_thread(_call)
+    last_error: Exception | None = None
+    for attempt in range(_MAX_ATTEMPTS):
+        try:
+            return await asyncio.to_thread(_call)
+        except VeoSafetyBlocked:
+            # Deterministic content-policy block — the same image+prompt will
+            # fail identically on retry, so don't waste another paid attempt.
+            raise
+        except (RuntimeError, TimeoutError) as e:
+            last_error = e
+            if attempt < _MAX_ATTEMPTS - 1:
+                await asyncio.sleep(_RETRY_BACKOFF_SEC[attempt])
+    assert last_error is not None
+    raise last_error

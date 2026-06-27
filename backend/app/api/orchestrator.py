@@ -14,6 +14,7 @@ import re
 import shutil
 from typing import Any
 
+from google import genai
 from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types as genai_types
@@ -28,7 +29,7 @@ from ..agents import (
 )
 from ..config import settings
 from ..storage import Session, cloud_cache
-from ..tools import generate_music, generate_voiceover
+from ..tools import generate_music, generate_voiceover, sync_video_audio
 
 
 _APP_NAME = "brandsync"
@@ -546,7 +547,13 @@ async def _rerun_director_scoped(session: Session, scope: set[str], instructions
         )
         await _regenerate_voiceover(session, instructions)
 
-    await _rerun_post_production(session)
+    if "images" in scope:
+        # The hero image actually changed — the video frames need to match.
+        await _rerun_post_production(session)
+    else:
+        # Only audio changed — remux the existing footage instead of paying
+        # for Veo again to regenerate video that doesn't need to change.
+        await _remux_only(session)
 
 
 def _sync_images_into_bundle(session: Session) -> None:
@@ -561,33 +568,68 @@ def _sync_images_into_bundle(session: Session) -> None:
     session.state["asset_bundle"] = bundle
 
 
+async def _rewrite_audio_direction(original: str, instructions: str, kind: str) -> str:
+    """Merge a feedback instruction into a music/voiceover direction as ONE
+    coherent description, rather than naively concatenating old+new — e.g.
+    old "driving acoustic guitar, brass stabs" + new "feature violin" both
+    landing in the same prompt produces a contradictory mix, not a swap."""
+    def _call() -> str:
+        client = genai.Client()
+        prompt = (
+            f"Current {kind} direction: \"{original}\"\n\n"
+            f"Requested change: \"{instructions}\"\n\n"
+            f"Rewrite the {kind} direction as ONE coherent 1-2 sentence description "
+            "that fully applies the requested change. If the change replaces an "
+            "element (e.g. a different lead instrument or voice quality), remove "
+            "the old one entirely instead of keeping both. Preserve any aspects "
+            "of the original the request doesn't mention (tempo, mood, genre fit). "
+            "Respond with ONLY the new description, no preamble, no quotes."
+        )
+        resp = client.models.generate_content(model=settings.MODEL_FAST, contents=[prompt])
+        return (resp.text or "").strip()
+
+    try:
+        new_direction = await asyncio.to_thread(_call)
+        return new_direction or instructions
+    except Exception:
+        # Best-effort rewrite — falling back to the raw instruction alone is
+        # still better than the old bug (blending stale + new descriptions).
+        return instructions
+
+
 async def _regenerate_music(session: Session, instructions: str) -> None:
-    brief = session.state["brand_brief"]
-    prompt = f"{brief['audio']['music_genre']}. Revision requested: {instructions}"
-    music_path = await generate_music(prompt, session_id=session.id)
+    brief = dict(session.state["brand_brief"])
+    new_genre = await _rewrite_audio_direction(brief["audio"]["music_genre"], instructions, "music")
+    music_path = await generate_music(new_genre, session_id=session.id)
     music_path = await cloud_cache.store_asset(music_path, session.id, "audio")
+
+    brief["audio"] = {**brief["audio"], "music_genre": new_genre}
+    session.state["brand_brief"] = brief
 
     bundle = dict(session.state["asset_bundle"])
     bundle["music_path"] = music_path
-    bundle["music_prompt"] = prompt
+    bundle["music_prompt"] = new_genre
     session.state["asset_bundle"] = bundle
 
     await session.emit(
-        "creative_director", "message", "Music regenerated",
+        "creative_director", "message", f"Music regenerated: {new_genre}",
         asset_bundle=bundle, phase="creative_director",
     )
 
 
 async def _regenerate_voiceover(session: Session, instructions: str) -> None:
-    brief = session.state["brand_brief"]
-    tone = f"{brief['audio']['voiceover_tone']}. Revision requested: {instructions}"
+    brief = dict(session.state["brand_brief"])
+    new_tone = await _rewrite_audio_direction(brief["audio"]["voiceover_tone"], instructions, "voiceover")
     voice_path, voice_dur = await generate_voiceover(
         script=brief["voiceover_script"],
         voice_name=brief["audio"]["voice_name"],
-        tone_hint=tone,
+        tone_hint=new_tone,
         session_id=session.id,
     )
     voice_path = await cloud_cache.store_asset(voice_path, session.id, "audio")
+
+    brief["audio"] = {**brief["audio"], "voiceover_tone": new_tone}
+    session.state["brand_brief"] = brief
 
     bundle = dict(session.state["asset_bundle"])
     bundle["voiceover_path"] = voice_path
@@ -595,6 +637,33 @@ async def _regenerate_voiceover(session: Session, instructions: str) -> None:
     session.state["asset_bundle"] = bundle
 
     await session.emit(
-        "creative_director", "message", "Voiceover regenerated",
+        "creative_director", "message", f"Voiceover regenerated: {new_tone}",
         asset_bundle=bundle, phase="creative_director",
     )
+
+
+async def _remux_only(session: Session) -> None:
+    """Re-mux the EXISTING Veo clips with the current music/voiceover —
+    used when feedback only concerns audio, so we don't pay for Veo again
+    to regenerate video frames that don't need to change. Falls back to a
+    full Post-Production re-run if no clips survived (e.g. a session from
+    before clips were kept instead of deleted after the first mux)."""
+    clip_paths = session.state.get("veo_clip_paths")
+    bundle = session.state.get("asset_bundle")
+    if not clip_paths or not bundle:
+        await _rerun_post_production(session)
+        return
+
+    await session.emit(
+        "system", "handoff", "→ Post-Production (remux only — no Veo re-run) taking over",
+        phase="post_production",
+    )
+    final_path, duration = await sync_video_audio(
+        video_paths=clip_paths,
+        music_path=bundle["music_path"],
+        voiceover_path=bundle["voiceover_path"],
+        session_id=session.id,
+    )
+    final_path = await cloud_cache.store_asset(final_path, session.id, "video")
+    session.state["final_video_path"] = final_path
+    session.state["final_duration"] = duration
