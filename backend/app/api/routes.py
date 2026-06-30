@@ -48,7 +48,7 @@ async def submit_feedback(
     body: FeedbackRequestBody,
     background: BackgroundTasks,
 ) -> dict:
-    session = store.get(session_id)
+    session = await store.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -62,7 +62,7 @@ async def submit_feedback(
 @router.post("/sessions/{session_id}/resume")
 async def resume_session(session_id: str, background: BackgroundTasks) -> dict:
     """Retry a failed run from its last successful stage instead of starting over."""
-    session = store.get(session_id)
+    session = await store.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if not session.error:
@@ -83,7 +83,7 @@ async def select_hero(
     """Override the auto-ranked hero image with a different already-generated
     candidate, then re-render only Post-Production (no re-scrape/re-brief/
     re-image-gen)."""
-    session = store.get(session_id)
+    session = await store.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if not session.state.get("ranked_images"):
@@ -98,7 +98,7 @@ async def select_hero(
 @router.get("/sessions/{session_id}/events")
 async def stream_events(session_id: str, request: Request) -> StreamingResponse:
     """SSE stream of all agent events for this session."""
-    session = store.get(session_id)
+    session = await store.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
@@ -139,7 +139,7 @@ def _format_sse(ev) -> str:
 @router.get("/sessions/{session_id}")
 async def get_session(session_id: str) -> dict:
     """Snapshot of session state — used by frontend for full state on connect."""
-    session = store.get(session_id)
+    session = await store.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return {

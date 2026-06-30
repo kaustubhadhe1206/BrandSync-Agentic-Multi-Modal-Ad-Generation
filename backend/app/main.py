@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api import router
+from .config import settings
 
 
 def create_app() -> FastAPI:
@@ -15,7 +16,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+        allow_origins=settings.allowed_origins_list,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -33,5 +34,9 @@ app = create_app()
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    # Local dev default stays port 8000 + reload; Render (and most PaaS)
+    # inject PORT and the Dockerfile's own CMD runs uvicorn without --reload
+    # directly, so this path mainly matters for `python -m app.main` locally.
+    uvicorn.run("app.main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 8000)), reload=True)

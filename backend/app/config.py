@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     SCRAPER_MAX_IMAGES_TO_ANALYZE: int = 5  # real images downloaded + described per scrape
     MAX_CRITIQUE_ITERATIONS: int = 4   # negotiation round cap (escalate gate usually exits earlier)
 
+    # --- Deployment ---
+    # Comma-separated list of origins allowed to call this API. Defaults to
+    # the local Vite dev server; production deploys must set this to the
+    # actual deployed frontend origin(s) (e.g. https://brandsync.vercel.app).
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
     # --- Filesystem ---
     OUTPUT_DIR: Path = Path("./artifacts")
     # Plain command names rely on PATH; override with an absolute path if

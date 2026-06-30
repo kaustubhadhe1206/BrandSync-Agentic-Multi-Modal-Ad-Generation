@@ -1,6 +1,9 @@
-// Thin API wrapper. Uses Vite proxy in dev (relative URLs).
+// Thin API wrapper. Relative URLs in dev (Vite proxy forwards /api/* to the
+// local backend). In production the frontend and backend are on different
+// domains — VITE_API_BASE_URL (set at build time) points at the deployed
+// backend; unset, this falls back to '' so local dev is unaffected.
 
-const BASE = '';
+const BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export async function startGeneration(url, forceRegenerate = false) {
   const r = await fetch(`${BASE}/api/generate`, {
