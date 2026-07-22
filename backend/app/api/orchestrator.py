@@ -263,7 +263,7 @@ def _cleanup_local_artifacts(session_id: str) -> None:
     shutil.rmtree(settings.OUTPUT_DIR / session_id, ignore_errors=True)
 
 
-async def run_full_pipeline(session: Session, url: str, force_regenerate: bool = False) -> None:
+async def run_full_pipeline(session: Session, url: str, force_regenerate: bool = False, creative_direction: str = "") -> None:
     """Run Strategist→Critic→Director→Post-Production end-to-end.
 
     Checks the cloud cache first (unless force_regenerate) — a hit skips
@@ -276,6 +276,8 @@ async def run_full_pipeline(session: Session, url: str, force_regenerate: bool =
             await _apply_cached_result(session, cached)
             return
 
+        if creative_direction:
+            session.state["user_creative_direction"] = creative_direction
         await _run_strategist_phase(session, url)
         await _run_director_phase(session)
         await _run_post_production_phase(session)

@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api")
 class GenerateRequest(BaseModel):
     url: HttpUrl
     force_regenerate: bool = False
+    creative_direction: str = ""
 
 
 class GenerateResponse(BaseModel):
@@ -38,7 +39,7 @@ class SelectHeroBody(BaseModel):
 async def generate(req: GenerateRequest, background: BackgroundTasks) -> GenerateResponse:
     """Start a new generation job. Returns session_id immediately; progress streams via /events."""
     session = store.create()
-    background.add_task(run_full_pipeline, session, str(req.url), req.force_regenerate)
+    background.add_task(run_full_pipeline, session, str(req.url), req.force_regenerate, req.creative_direction)
     return GenerateResponse(session_id=session.id)
 
 

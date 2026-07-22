@@ -14,6 +14,7 @@ const AGENTS = [
 
 export default function Home() {
   const [url, setUrl] = useState('');
+  const [creativeDirection, setCreativeDirection] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [forceRegenerate, setForceRegenerate] = useState(false);
@@ -26,7 +27,7 @@ export default function Home() {
     setErr(null);
     try {
       const normalized = url.startsWith('http') ? url : `https://${url}`;
-      const { session_id } = await startGeneration(normalized, forceRegenerate);
+      const { session_id } = await startGeneration(normalized, forceRegenerate, creativeDirection.trim());
       nav(`/g/${session_id}`);
     } catch (e) {
       setErr(e.message || 'Failed to start');
@@ -63,23 +64,33 @@ export default function Home() {
             produce a finished cinematic video ad. You watch them work.
           </p>
 
-          <form onSubmit={submit} className="flex gap-3 max-w-xl">
-            <input
-              type="text"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="tonyspizza.com"
+          <form onSubmit={submit} className="flex flex-col gap-3 max-w-xl">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="tonyspizza.com"
+                disabled={busy}
+                autoFocus
+                className="flex-1 bg-ink-800 border border-ink-700 rounded-xl px-5 py-4 text-[16px] text-bone placeholder-ink-500 focus:outline-none focus:border-coral transition"
+              />
+              <button
+                type="submit"
+                disabled={busy || !url.trim()}
+                className="bg-coral hover:bg-coral-dark text-bone font-medium rounded-xl px-8 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_32px_rgba(124,92,252,0.35)] hover:shadow-[0_0_40px_rgba(124,92,252,0.5)]"
+              >
+                {busy ? 'Starting…' : 'Begin'}
+              </button>
+            </div>
+            <textarea
+              value={creativeDirection}
+              onChange={(e) => setCreativeDirection(e.target.value)}
+              placeholder="Optional: add your creative direction — e.g. 'Tom & Jerry cartoon style', 'dark and cinematic', 'energetic Gen-Z tone'"
               disabled={busy}
-              autoFocus
-              className="flex-1 bg-ink-800 border border-ink-700 rounded-xl px-5 py-4 text-[16px] text-bone placeholder-ink-500 focus:outline-none focus:border-coral transition"
+              rows={2}
+              className="w-full bg-ink-800 border border-ink-700 rounded-xl px-5 py-3 text-[14px] text-bone placeholder-ink-500 focus:outline-none focus:border-coral transition resize-none"
             />
-            <button
-              type="submit"
-              disabled={busy || !url.trim()}
-              className="bg-coral hover:bg-coral-dark text-bone font-medium rounded-xl px-8 transition disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_32px_rgba(124,92,252,0.35)] hover:shadow-[0_0_40px_rgba(124,92,252,0.5)]"
-            >
-              {busy ? 'Starting…' : 'Begin'}
-            </button>
           </form>
 
           {err && (

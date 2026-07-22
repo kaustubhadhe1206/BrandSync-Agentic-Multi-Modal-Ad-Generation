@@ -5,11 +5,11 @@
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '';
 
-export async function startGeneration(url, forceRegenerate = false) {
+export async function startGeneration(url, forceRegenerate = false, creativeDirection = '') {
   const r = await fetch(`${BASE}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url, force_regenerate: forceRegenerate }),
+    body: JSON.stringify({ url, force_regenerate: forceRegenerate, creative_direction: creativeDirection }),
   });
   if (!r.ok) throw new Error(`generate failed: ${r.status}`);
   return r.json(); // { session_id }

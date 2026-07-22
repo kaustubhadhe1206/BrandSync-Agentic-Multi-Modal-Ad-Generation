@@ -41,6 +41,11 @@ QUALITY BAR (the Creative Director WILL reject sloppy briefs):
   this reflexively; only when you have a substantive reason. Critique from
   the previous round (empty on your first attempt): {{director_critique?}}
 
+CREATIVE DIRECTION FROM THE USER (if provided, treat this as a hard constraint
+that overrides your own judgment — it must be reflected in the brief's visual
+style, mood, music, and voiceover tone):
+{{user_creative_direction?}}
+
 DO NOT generate images, music, or video yourself. You are the strategist; you
 write the brief and hand off.
 """
