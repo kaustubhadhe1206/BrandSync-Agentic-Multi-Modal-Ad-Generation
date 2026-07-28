@@ -8,9 +8,12 @@ from __future__ import annotations
 import asyncio
 import shlex
 import subprocess
+import urllib.request
 from pathlib import Path
 
 from ..config import settings
+
+_FFMPEG_TIMEOUT_SEC = 600  # 10 min hard ceiling; hangs past this are a bug
 
 
 async def _run_ffmpeg(args: list[str]) -> None:
@@ -19,7 +22,11 @@ async def _run_ffmpeg(args: list[str]) -> None:
     # support there) — run via a worker thread instead, same pattern used
     # for every other blocking SDK call in this codebase.
     def _call() -> subprocess.CompletedProcess:
-        return subprocess.run([settings.FFMPEG_PATH, *args], capture_output=True)
+        return subprocess.run(
+            [settings.FFMPEG_PATH, *args],
+            capture_output=True,
+            timeout=_FFMPEG_TIMEOUT_SEC,
+        )
 
     result = await asyncio.to_thread(_call)
     if result.returncode != 0:
@@ -28,6 +35,23 @@ async def _run_ffmpeg(args: list[str]) -> None:
             f"command: {settings.FFMPEG_PATH} {' '.join(shlex.quote(a) for a in args)}\n"
             f"stderr: {result.stderr.decode(errors='replace')[-2000:]}"
         )
+
+
+async def _localize(path: str, dest_dir: Path) -> str:
+    """Download a remote URL to a local file before passing to FFmpeg.
+
+    FFmpeg supports HTTP inputs natively, but -stream_loop on an HTTP source
+    re-downloads the file on every loop iteration (HTTP is not seekable like
+    a local file). Downloading first avoids the hang and is faster overall.
+    Returns the path unchanged for inputs that are already local.
+    """
+    if not path.startswith("http"):
+        return path
+    suffix = Path(path.split("?")[0]).suffix or ".bin"
+    local = dest_dir / f"_dl_{abs(hash(path))}{suffix}"
+    if not local.exists():
+        await asyncio.to_thread(urllib.request.urlretrieve, path, str(local))
+    return str(local)
 
 
 async def sync_video_audio(
@@ -53,6 +77,13 @@ async def sync_video_audio(
     out_dir = settings.OUTPUT_DIR / session_id
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "final.mp4"
+
+    # Download any remote (Supabase) inputs to local disk before passing to
+    # FFmpeg. -stream_loop on an HTTP source re-fetches on every iteration
+    # since HTTP is not seekable; local files don't have this problem.
+    video_paths = [await _localize(p, out_dir) for p in video_paths]
+    music_path = await _localize(music_path, out_dir)
+    voiceover_path = await _localize(voiceover_path, out_dir)
 
     # 1. Probe each clip and sum durations — that's the concatenated length
     # we trim/pad audio to.
