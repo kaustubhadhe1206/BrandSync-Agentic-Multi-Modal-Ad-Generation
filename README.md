@@ -2,6 +2,8 @@
 
 > A multi-agent AI system that turns a website URL into a cinematic video ad.
 
+**Live demo:** [brand-sync-agentic-multi-modal-ad-g.vercel.app](https://brand-sync-agentic-multi-modal-ad-g.vercel.app)
+
 ```
 URL ──► Strategist ◄──critique/rebuttal──► Critic   (LoopAgent, up to 4 rounds)
               │
@@ -172,11 +174,17 @@ brandsync/
 
 Backend needs a **persistent process** (not serverless — SSE connections stay open for minutes during generation) and `ffmpeg` as a system binary. The `Dockerfile` handles both.
 
-Recommended free-tier path: **Render** (backend, no card required) + **Vercel** (frontend static) + **Supabase** (already required for storage).
+**This project is deployed at:**
+- Frontend: [brand-sync-agentic-multi-modal-ad-g.vercel.app](https://brand-sync-agentic-multi-modal-ad-g.vercel.app) (Vercel)
+- Backend: [brandsync-agentic-multi-modal-ad.onrender.com](https://brandsync-agentic-multi-modal-ad.onrender.com) (Render)
+
+Free-tier stack: **Render** (backend Docker, no card required) + **Vercel** (frontend static) + **Supabase** (storage + session persistence).
 
 1. Create the Supabase tables above if you haven't
 2. On Render: New Web Service → connect repo → root dir `backend` → Docker runtime → add env vars (`GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_KEY`, `ALLOWED_ORIGINS` = your Vercel URL)
 3. On Vercel: New Project → root dir `frontend` → add build env var `VITE_API_BASE_URL` = your Render URL
+
+> **Note:** Render's free tier sleeps after 15 minutes of inactivity. The first request after a sleep has a ~30-60s cold start delay before the backend responds — this is normal, not a crash.
 
 ## Cost note
 
