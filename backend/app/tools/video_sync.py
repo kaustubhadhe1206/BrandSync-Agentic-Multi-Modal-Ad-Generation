@@ -8,12 +8,14 @@ from __future__ import annotations
 import asyncio
 import shlex
 import subprocess
-import urllib.request
 from pathlib import Path
+
+import httpx
 
 from ..config import settings
 
-_FFMPEG_TIMEOUT_SEC = 600  # 10 min hard ceiling; hangs past this are a bug
+_FFMPEG_TIMEOUT_SEC = 600   # 10 min hard ceiling; hangs past this are a bug
+_DOWNLOAD_TIMEOUT_SEC = 120  # per-file download timeout
 
 
 async def _run_ffmpeg(args: list[str]) -> None:
@@ -50,7 +52,12 @@ async def _localize(path: str, dest_dir: Path) -> str:
     suffix = Path(path.split("?")[0]).suffix or ".bin"
     local = dest_dir / f"_dl_{abs(hash(path))}{suffix}"
     if not local.exists():
-        await asyncio.to_thread(urllib.request.urlretrieve, path, str(local))
+        async with httpx.AsyncClient(timeout=_DOWNLOAD_TIMEOUT_SEC) as client:
+            async with client.stream("GET", path) as resp:
+                resp.raise_for_status()
+                with open(local, "wb") as f:
+                    async for chunk in resp.aiter_bytes(chunk_size=65536):
+                        f.write(chunk)
     return str(local)
 
 
@@ -122,7 +129,8 @@ async def sync_video_audio(
         "-map", "[vout]",
         "-map", "[aout]",
         "-c:v", "libx264",
-        "-crf", "18",
+        "-preset", "ultrafast",  # ~10x faster than default on shared CPU
+        "-crf", "23",
         "-c:a", "aac",
         "-b:a", "192k",
         "-shortest",
