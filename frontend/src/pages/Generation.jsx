@@ -153,6 +153,13 @@ export default function Generation() {
   const finalVideo = session?.state?.final_video_path;
   const duration = session?.state?.final_duration;
   const hasError = session?.error;
+  // Session is orphaned when the backend redeployed mid-run: not finished,
+  // no error, but the SSE stream is dead. Show a force-retry after 3 min.
+  const isOrphaned = !session?.finished && !hasError && !finalVideo &&
+    events.length > 0 && (() => {
+      const last = events[events.length - 1];
+      return last && (Date.now() / 1000 - last.timestamp) > 180;
+    })();
 
   // Reset stream consumption and reopen — used whenever a background action
   // (feedback, retry, hero override) queues new agent activity on this session.
@@ -286,6 +293,22 @@ export default function Generation() {
                 </button>
               </div>
               <p className="text-[14px] text-bone/85">{hasError}</p>
+            </div>
+          )}
+
+          {isOrphaned && (
+            <div className="slate-frame p-6">
+              <div className="flex items-baseline justify-between mb-2">
+                <span className="eyebrow text-ink-400">Session stalled</span>
+                <button
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="font-mono text-[11px] uppercase tracking-[0.15em] text-bone/80 hover:text-coral border border-ink-700 hover:border-coral rounded-full px-3 py-1.5 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {retrying ? 'Resuming…' : 'Force retry'}
+                </button>
+              </div>
+              <p className="text-[13px] text-ink-400">No activity for 3+ minutes — the backend may have restarted mid-run. Force retry will resume from the last completed stage.</p>
             </div>
           )}
 

@@ -310,7 +310,19 @@ async def resume_pipeline(session: Session) -> None:
             await session.emit("system", "message", "Resuming — assets already bundled, skipping Creative Director.")
 
         if "final_video_path" not in session.state:
-            await _run_post_production_phase(session)
+            if "veo_clip_paths" in session.state:
+                # Veo clips already generated — only the mux failed.
+                # Skip the expensive Veo re-run and go straight to sync.
+                await session.emit("system", "message", "Resuming — Veo clips already generated, skipping straight to sync.")
+                await _remux_only(session)
+                await session.emit(
+                    "post_production", "done", "Final video ready",
+                    final_video_path=session.state["final_video_path"],
+                    duration_sec=session.state.get("final_duration"),
+                    phase="post_production",
+                )
+            else:
+                await _run_post_production_phase(session)
         else:
             await session.emit("system", "message", "Resuming — final video already produced.")
 

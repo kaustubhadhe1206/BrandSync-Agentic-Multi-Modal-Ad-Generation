@@ -66,8 +66,8 @@ async def resume_session(session_id: str, background: BackgroundTasks) -> dict:
     session = await store.get(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    if not session.error:
-        raise HTTPException(status_code=400, detail="Session has no error to resume from")
+    if session.finished and not session.error:
+        raise HTTPException(status_code=400, detail="Session already completed successfully")
 
     session.finished = False
     session.error = None
